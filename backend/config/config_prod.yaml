@@ -1,0 +1,12 @@
+app:
+  port: 5002
+  log_level: INFO
+  use_mock: false
+
+gaussdb:
+  host: 127.0.0.1
+  port: 5432
+  user: root
+  database: postgres
+  schema: coreinfactory
+  sslmode: disable

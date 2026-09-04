@@ -1,0 +1,14 @@
+app:
+  port: 5002
+  log_level: INFO
+  # true: 使用内存样例数据，无需连接高斯数据库
+  # false: 连接 gaussdb 配置读取 cli_command_event
+  use_mock: true
+
+gaussdb:
+  host: 127.0.0.1
+  port: 5432
+  user: root
+  database: postgres
+  schema: coreinfactory
+  sslmode: disable
