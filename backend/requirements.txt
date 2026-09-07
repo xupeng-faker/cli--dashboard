@@ -9,8 +9,8 @@ Flask-CORS==4.0.0
 python-dotenv==1.0.0
 PyYAML==6.0.1
 
-# Database (GaussDB official Python DBAPI)
-gaussdb==1.0.4
+# Database (openGauss pure-Python PG-API)
+py-opengauss==1.3.11
 SQLAlchemy==2.0.36
 
 # Production server (optional)

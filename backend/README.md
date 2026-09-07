@@ -1,6 +1,6 @@
 # CoreToolCLI 看板后端
 
-技术栈与 honorHall 对齐：Python 3.9、Flask 3.0 + SQLAlchemy 2.0 + PyYAML。数据源为高斯数据库 `coreinfactory.cli_command_event`。
+技术栈与 honorHall 对齐：Python 3.9、Flask 3.0 + PyYAML。数据源为 openGauss 数据库 `coreinfactory.cli_command_event`。
 
 ## 本地启动（样例数据）
 
@@ -33,20 +33,33 @@ export FLASK_ENV=local   # 或 prod
 python wsgi.py
 ```
 
-后端使用 `gaussdb-python`（导入名为 `gaussdb`）连接 GaussDB，避免普通
-`psycopg2` 与 GaussDB SHA256/SM3 SASL 认证不兼容。
+后端使用纯 Python 的 `py-opengauss==1.3.11` 原生 PG-API，不经过
+SQLAlchemy 或 `py_opengauss.driver.dbapi20`。该方案不依赖系统 `libpq`，
+Windows 无需安装或配置 `libpq.dll`。
 
-`gaussdb` 运行时还需要与目标数据库版本匹配的 GaussDB 官方客户端
-`libpq` 动态库：
-
-- Windows：将包含 `libpq.dll` 及其依赖 DLL 的官方客户端目录加入 `PATH`
-- Linux：将官方客户端 `lib` 目录加入 `LD_LIBRARY_PATH`
-
-安装后先执行以下命令确认驱动和动态库均可加载：
+依赖随 `requirements.txt` 安装，也可单独安装并验证：
 
 ```bash
-python -c "import gaussdb; print(gaussdb.__version__)"
+pip install py-opengauss==1.3.11
+python -c "import py_opengauss; from importlib.metadata import version; print(version('py-opengauss'))"
 ```
+
+应用按现有配置构造单地址连接，例如配置为：
+
+```yaml
+gaussdb:
+  host: 127.0.0.1
+  port: 5432
+  user: root
+  database: postgres
+  schema: coreinfactory
+  sslmode: disable
+```
+
+对应连接形式为
+`py_opengauss.open("opengauss://root:<URL 编码密码>@127.0.0.1:5432/postgres?%5Bsslmode%5D=disable")`。
+用户名和密码由应用自动做 URL 编码；密码仍从 `GAUSS_PASSWORD` 读取和解码，
+不要将明文密码写入 YAML。
 
 ## 接口
 

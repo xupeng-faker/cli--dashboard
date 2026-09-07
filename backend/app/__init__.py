@@ -2,7 +2,6 @@
 """
 Flask 应用工厂。
 """
-import atexit
 import logging
 from logging.config import dictConfig
 
@@ -10,7 +9,7 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 
 from .config import get_config_class
-from .db.sqlalchemy_session import close_engine, init_sqlalchemy_engine
+from .db.opengauss_connection import init_database
 from .routes.dashboard import bp as dashboard_bp
 from .routes.health import bp as health_bp
 from .settings import get_settings
@@ -75,18 +74,12 @@ def create_app() -> Flask:
     app.config.update(settings)
 
     CORS(app, resources={r"/cli_api/.*": {"origins": "*"}})
-    if not settings["USE_MOCK"]:
-        init_sqlalchemy_engine(app)
+    init_database(app)
 
     app.register_blueprint(health_bp, url_prefix="/cli_api/health")
     app.register_blueprint(dashboard_bp, url_prefix="/cli_api/dashboard")
     _register_error_handlers(app)
 
-    def _cleanup_resources() -> None:
-        with app.app_context():
-            close_engine()
-
-    atexit.register(_cleanup_resources)
     app.logger.info(
         "CLI dashboard backend initialized. data_source='%s'",
         "mock" if settings["USE_MOCK"] else "gaussdb",

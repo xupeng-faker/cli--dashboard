@@ -6,7 +6,7 @@ import logging
 
 from flask import Blueprint, current_app, jsonify
 
-from app.db.sqlalchemy_session import ping_database
+from app.db.opengauss_connection import ping_database
 
 logger = logging.getLogger(__name__)
 
