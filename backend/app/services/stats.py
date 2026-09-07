@@ -67,19 +67,6 @@ def filter_events(
     ]
 
 
-def _percentile(values: List[float], pct: float) -> Optional[float]:
-    if not values:
-        return None
-    ordered = sorted(values)
-    if len(ordered) == 1:
-        return float(ordered[0])
-    rank = (len(ordered) - 1) * pct
-    low = int(rank)
-    high = min(low + 1, len(ordered) - 1)
-    weight = rank - low
-    return ordered[low] * (1 - weight) + ordered[high] * weight
-
-
 def compute_metrics(events: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     total = len(events)
     users = {event["user_id"] for event in events}
@@ -97,8 +84,6 @@ def compute_metrics(events: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
         "success_rate": (success_count / total * 100) if total else 0,
         "avg_duration_ms": avg_duration,
         "avg_api_duration_ms": avg_api,
-        "p50_duration_ms": _percentile(durations, 0.5) or 0,
-        "p95_duration_ms": _percentile(durations, 0.95) or 0,
     }
 
 
@@ -232,12 +217,6 @@ def error_category_stats(events: Sequence[Dict[str, Any]]) -> List[Dict[str, Any
 def error_code_stats(events: Sequence[Dict[str, Any]], limit: int = 15) -> List[Dict[str, Any]]:
     failed = [event for event in events if event.get("error_code")]
     return count_by(failed, "error_code", limit=limit)
-
-
-def slow_commands(events: Sequence[Dict[str, Any]], limit: int = 10) -> List[Dict[str, Any]]:
-    rows = command_stats(events, limit=200)
-    rows.sort(key=lambda item: item["p95_duration_ms"], reverse=True)
-    return rows[:limit]
 
 
 def duration_buckets(events: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:

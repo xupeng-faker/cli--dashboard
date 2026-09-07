@@ -9,7 +9,7 @@ from flask import current_app
 
 from app.services.gauss_repository import GaussRepository
 from app.services.mock_repository import MockRepository
-from app.services.query import EventQuery, lifetime_query, month_query
+from app.services.query import EventQuery, lifetime_query, month_query, previous_month_to_date_query
 from app.utils.timeutil import as_aware, to_iso
 
 __all__ = [
@@ -17,6 +17,7 @@ __all__ = [
     "get_overview",
     "get_commands",
     "get_users",
+    "get_departments",
     "get_quality",
     "get_events",
     "get_filter_options",
@@ -48,8 +49,8 @@ def _kpi(
     if hint is None:
         if previous:
             change = round((float(current or 0) - float(previous)) / float(previous) * 100, 1)
-        elif current:
-            change = 100.0
+        else:
+            change = 100.0 if current else 0.0
     payload = {
         "value": current_value,
         "prev": previous_value,
@@ -82,26 +83,43 @@ def _effective_query(repo, query: EventQuery) -> EventQuery:
 def get_overview(query: EventQuery) -> Dict[str, Any]:
     repo = get_repository()
     chart_query = _effective_query(repo, query)
-    lifetime = repo.metrics(lifetime_query(query))
-    this_month = repo.metrics(month_query(query, 0))
-    last_month = repo.metrics(month_query(query, 1))
+    lifetime_range = lifetime_query(query)
+    this_month_range = month_query(query, 0)
+    lifetime = repo.metrics(lifetime_range)
+    month_start_lifetime = repo.metrics(replace(lifetime_range, end=this_month_range.start))
+    this_month = repo.metrics(this_month_range)
+    last_month = repo.metrics(previous_month_to_date_query(query))
+    new_users = repo.new_users(month_query(query, 0))
+    previous_new_users = repo.new_users(previous_month_to_date_query(query))
     return {
         "data_source": repo.source,
         "range": _range_meta(chart_query),
         "kpis": {
-            "total_calls": _kpi(lifetime["total_calls"], None, hint="历史累计"),
-            "mau": _kpi(this_month["unique_users"], last_month["unique_users"], compare_label="较上月"),
-            "month_calls": _kpi(this_month["total_calls"], last_month["total_calls"], compare_label="较上月"),
-            "success_rate": _kpi(this_month["success_rate"], last_month["success_rate"], compare_label="较上月"),
-            "avg_duration_ms": _kpi(this_month["avg_duration_ms"], last_month["avg_duration_ms"], compare_label="较上月"),
-            "p95_duration_ms": _kpi(this_month["p95_duration_ms"], last_month["p95_duration_ms"], compare_label="较上月"),
+            "total_calls": _kpi(
+                lifetime["total_calls"],
+                month_start_lifetime["total_calls"],
+                compare_label="较本月初",
+            ),
+            "total_users": _kpi(
+                lifetime["unique_users"],
+                month_start_lifetime["unique_users"],
+                compare_label="较本月初",
+            ),
+            "mau": _kpi(this_month["unique_users"], last_month["unique_users"], compare_label="较上月同期"),
+            "new_users": _kpi(new_users, previous_new_users, compare_label="较上月同期"),
+            "month_calls": _kpi(this_month["total_calls"], last_month["total_calls"], compare_label="较上月同期"),
+            "avg_calls_per_user": _kpi(
+                this_month["total_calls"] / this_month["unique_users"] if this_month["unique_users"] else 0,
+                last_month["total_calls"] / last_month["unique_users"] if last_month["unique_users"] else 0,
+                compare_label="较上月同期",
+            ),
         },
         "trend": repo.trend(chart_query),
         "result_dist": repo.distribution(chart_query, "result"),
         "domain_dist": repo.distribution(chart_query, "domain"),
         "platform_dist": repo.distribution(chart_query, "platform"),
         "input_source_dist": repo.distribution(chart_query, "input_source"),
-        "dept5_dist": repo.departments(chart_query, field="org_dept_name5"),
+        "dept4_dist": repo.departments(chart_query, field="org_dept_name4"),
         "top_commands": repo.commands(chart_query, limit=10),
     }
 
@@ -131,6 +149,28 @@ def get_users(query: EventQuery) -> Dict[str, Any]:
     }
 
 
+def get_departments(
+    query: EventQuery,
+    level: int,
+    dept4: Optional[str] = None,
+    dept5: Optional[str] = None,
+) -> Dict[str, Any]:
+    repo = get_repository()
+    return {
+        "data_source": repo.source,
+        "range": _range_meta(query),
+        "level": level,
+        "dept4": dept4,
+        "dept5": dept5,
+        "departments": repo.departments(
+            query,
+            field=f"org_dept_name{level}",
+            dept4=dept4,
+            dept5=dept5,
+        ),
+    }
+
+
 def get_quality(query: EventQuery) -> Dict[str, Any]:
     repo = get_repository()
     return {
@@ -140,7 +180,6 @@ def get_quality(query: EventQuery) -> Dict[str, Any]:
         "trend": repo.trend(query),
         "error_categories": repo.error_categories(query),
         "error_codes": repo.error_codes(query),
-        "slow_commands": repo.slow_commands(query),
         "duration_histogram": repo.duration_histogram(query),
     }
 

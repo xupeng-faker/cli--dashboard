@@ -21,8 +21,6 @@ export interface MetricRow {
   success_rate: number
   avg_duration_ms: number
   avg_api_duration_ms: number
-  p50_duration_ms: number
-  p95_duration_ms: number
 }
 
 export interface TrendPoint {
@@ -58,18 +56,18 @@ export interface OverviewPayload {
   range: TimeRangeMeta
   kpis: {
     total_calls: KpiValue
+    total_users: KpiValue
     mau: KpiValue
+    new_users: KpiValue
     month_calls: KpiValue
-    success_rate: KpiValue
-    avg_duration_ms: KpiValue
-    p95_duration_ms: KpiValue
+    avg_calls_per_user: KpiValue
   }
   trend: TrendPoint[]
   result_dist: NamedMetric[]
   domain_dist: NamedMetric[]
   platform_dist: NamedMetric[]
   input_source_dist: NamedMetric[]
-  dept5_dist: NamedMetric[]
+  dept4_dist: NamedMetric[]
   top_commands: CommandRow[]
 }
 
@@ -92,6 +90,15 @@ export interface UsersPayload {
   trend: TrendPoint[]
 }
 
+export interface DepartmentsPayload {
+  data_source: 'mock' | 'gaussdb'
+  range: TimeRangeMeta
+  level: 4 | 5 | 6
+  dept4: string | null
+  dept5: string | null
+  departments: NamedMetric[]
+}
+
 export interface QualityPayload {
   data_source: 'mock' | 'gaussdb'
   range: TimeRangeMeta
@@ -99,7 +106,6 @@ export interface QualityPayload {
   trend: TrendPoint[]
   error_categories: NamedMetric[]
   error_codes: NamedMetric[]
-  slow_commands: CommandRow[]
   duration_histogram: { name: string; total_calls: number }[]
 }
 

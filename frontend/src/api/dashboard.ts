@@ -2,6 +2,7 @@ import { http } from './http'
 import type {
   CommandsPayload,
   DashboardQuery,
+  DepartmentsPayload,
   EventsPayload,
   FilterOptions,
   OverviewPayload,
@@ -23,6 +24,15 @@ export function get_commands(query: DashboardQuery) {
 
 export function get_users(query: DashboardQuery) {
   return http.get<UsersPayload>('/dashboard/users', { params: as_params(query) }).then((resp) => resp.data)
+}
+
+export function get_departments(query: DashboardQuery, level: 4 | 5 | 6, dept4?: string, dept5?: string) {
+  const extra: Record<string, string | number> = { level }
+  if (dept4) extra.dept4 = dept4
+  if (dept5) extra.dept5 = dept5
+  return http
+    .get<DepartmentsPayload>('/dashboard/departments', { params: as_params(query, extra) })
+    .then((resp) => resp.data)
 }
 
 export function get_quality(query: DashboardQuery) {

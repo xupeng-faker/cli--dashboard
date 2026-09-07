@@ -28,6 +28,16 @@ class MockRepository:
     def metrics(self, query: EventQuery) -> Dict[str, Any]:
         return stats.compute_metrics(self._rows(query))
 
+    def new_users(self, query: EventQuery) -> int:
+        rows = stats.filter_events(get_mock_events(), query, ignore_time=True)
+        first_seen: Dict[str, datetime] = {}
+        for item in rows:
+            user_id = item["user_id"]
+            event_time = item["event_time"]
+            if user_id not in first_seen or event_time < first_seen[user_id]:
+                first_seen[user_id] = event_time
+        return sum(1 for event_time in first_seen.values() if query.start <= event_time < query.end)
+
     def trend(self, query: EventQuery) -> List[Dict[str, Any]]:
         return stats.compute_trend(self._rows(query), query)
 
@@ -40,17 +50,25 @@ class MockRepository:
     def users(self, query: EventQuery, limit: int = 30) -> List[Dict[str, Any]]:
         return stats.user_stats(self._rows(query), limit=limit)
 
-    def departments(self, query: EventQuery, field: str = "org_dept_name4") -> List[Dict[str, Any]]:
-        return stats.dept_stats(self._rows(query), key=field)
+    def departments(
+        self,
+        query: EventQuery,
+        field: str = "org_dept_name4",
+        dept4: Optional[str] = None,
+        dept5: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        rows = self._rows(query)
+        if dept4:
+            rows = [item for item in rows if item.get("org_dept_name4") == dept4]
+        if dept5:
+            rows = [item for item in rows if item.get("org_dept_name5") == dept5]
+        return stats.dept_stats(rows, key=field)
 
     def error_categories(self, query: EventQuery) -> List[Dict[str, Any]]:
         return stats.error_category_stats(self._rows(query))
 
     def error_codes(self, query: EventQuery, limit: int = 15) -> List[Dict[str, Any]]:
         return stats.error_code_stats(self._rows(query), limit=limit)
-
-    def slow_commands(self, query: EventQuery, limit: int = 10) -> List[Dict[str, Any]]:
-        return stats.slow_commands(self._rows(query), limit=limit)
 
     def duration_histogram(self, query: EventQuery) -> List[Dict[str, Any]]:
         return stats.duration_buckets(self._rows(query))

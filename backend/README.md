@@ -41,8 +41,11 @@ GaussDB / OpenGauss 使用 PostgreSQL 协议，驱动为 `psycopg2`。
 - `GET /cli_api/dashboard/overview`
 - `GET /cli_api/dashboard/commands`
 - `GET /cli_api/dashboard/users`
+- `GET /cli_api/dashboard/departments`
 - `GET /cli_api/dashboard/quality`
 - `GET /cli_api/dashboard/events`
 - `GET /cli_api/dashboard/filters`
 
 公共筛选参数：`start`、`end`（ISO 8601）、`domain`、`platform`、`environment`、`result`、`command_name`、`user_id`、`input_source`、`keyword`。
+
+部门下钻接口额外接收 `level`（4、5、6）、`dept4` 和 `dept5`；查询五级部门时必须传 `dept4`，查询六级部门时必须同时传 `dept4`、`dept5`。

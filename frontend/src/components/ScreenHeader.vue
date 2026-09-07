@@ -9,8 +9,6 @@ const presets: { label: string; id: RangePreset }[] = [
   { label: '近 12 月', id: '12m' },
   { label: '全部', id: 'all' },
 ]
-
-const source_label = () => (filters.options.data_source === 'gaussdb' ? 'GAUSSDB' : 'DEMO')
 </script>
 
 <template>
@@ -28,7 +26,6 @@ const source_label = () => (filters.options.data_source === 'gaussdb' ? 'GAUSSDB
       <div class="wing right" />
     </div>
     <div class="side right">
-      <div class="kicker">{{ source_label() }}</div>
       <div class="presets">
         <button
           v-for="item in presets"
@@ -122,7 +119,6 @@ h1 {
 }
 
 .presets {
-  margin-top: 8px;
   display: flex;
   justify-content: flex-end;
   gap: 8px;

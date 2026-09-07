@@ -105,8 +105,6 @@ class GaussRepository:
             func.coalesce(func.sum(_failure_case()), 0).label("failure_count"),
             func.coalesce(func.avg(Event.duration_ms), 0).label("avg_duration_ms"),
             func.coalesce(func.avg(Event.api_duration_ms), 0).label("avg_api_duration_ms"),
-            func.percentile_cont(0.5).within_group(Event.duration_ms).label("p50_duration_ms"),
-            func.percentile_cont(0.95).within_group(Event.duration_ms).label("p95_duration_ms"),
         ]
 
     def _row_metrics(self, row: Any) -> Dict[str, Any]:
@@ -120,8 +118,6 @@ class GaussRepository:
             "success_rate": (success_count / total * 100) if total else 0,
             "avg_duration_ms": _num(row.avg_duration_ms),
             "avg_api_duration_ms": _num(getattr(row, "avg_api_duration_ms", 0)),
-            "p50_duration_ms": _num(getattr(row, "p50_duration_ms", 0)),
-            "p95_duration_ms": _num(getattr(row, "p95_duration_ms", 0)),
         }
 
     def earliest_time(self, query: EventQuery) -> Optional[datetime]:
@@ -136,6 +132,25 @@ class GaussRepository:
             stmt = select(*self._metric_columns()).where(*self._where(query))
             row = session.execute(stmt).one()
             return self._row_metrics(row)
+
+        return self._execute(handler)
+
+    def new_users(self, query: EventQuery) -> int:
+        def handler(session: Session) -> int:
+            first_seen = (
+                select(
+                    Event.user_id.label("user_id"),
+                    func.min(Event.event_time).label("first_seen"),
+                )
+                .where(*self._where(query, ignore_time=True))
+                .group_by(Event.user_id)
+                .subquery()
+            )
+            stmt = select(func.count()).select_from(first_seen).where(
+                first_seen.c.first_seen >= query.start,
+                first_seen.c.first_seen < query.end,
+            )
+            return int(session.execute(stmt).scalar_one())
 
         return self._execute(handler)
 
@@ -161,8 +176,6 @@ class GaussRepository:
                             "failure_count": 0,
                             "avg_duration_ms": 0,
                             "avg_api_duration_ms": 0,
-                            "p50_duration_ms": 0,
-                            "p95_duration_ms": 0,
                         })()
                     )
                 rows.append(
@@ -253,7 +266,13 @@ class GaussRepository:
 
         return self._execute(handler)
 
-    def departments(self, query: EventQuery, field: str = "org_dept_name4") -> List[Dict[str, Any]]:
+    def departments(
+        self,
+        query: EventQuery,
+        field: str = "org_dept_name4",
+        dept4: Optional[str] = None,
+        dept5: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         columns = {
             "org_dept_name4": Event.org_dept_name4,
             "org_dept_name5": Event.org_dept_name5,
@@ -263,9 +282,14 @@ class GaussRepository:
         dim = func.coalesce(column, "未填写部门")
 
         def handler(session: Session) -> List[Dict[str, Any]]:
+            conditions = self._where(query)
+            if dept4:
+                conditions.append(Event.org_dept_name4 == dept4)
+            if dept5:
+                conditions.append(Event.org_dept_name5 == dept5)
             stmt = (
                 select(dim.label("name"), *self._metric_columns())
-                .where(*self._where(query))
+                .where(*conditions)
                 .group_by(dim)
                 .order_by(func.count().desc())
             )
@@ -294,11 +318,6 @@ class GaussRepository:
             return [{"name": row.name, **self._row_metrics(row)} for row in session.execute(stmt)]
 
         return self._execute(handler)
-
-    def slow_commands(self, query: EventQuery, limit: int = 10) -> List[Dict[str, Any]]:
-        rows = self.commands(query, limit=200)
-        rows.sort(key=lambda item: item["p95_duration_ms"], reverse=True)
-        return rows[:limit]
 
     def duration_histogram(self, query: EventQuery) -> List[Dict[str, Any]]:
         labels_and_conds = [

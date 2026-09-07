@@ -8,7 +8,13 @@ from typing import Optional
 
 from app.utils.timeutil import TZ_SHANGHAI, calendar_month_bounds, now_shanghai, pick_granularity
 
-__all__ = ["EventQuery", "previous_query", "lifetime_query", "month_query"]
+__all__ = [
+    "EventQuery",
+    "previous_query",
+    "lifetime_query",
+    "month_query",
+    "previous_month_to_date_query",
+]
 
 LIFETIME_START = datetime(2000, 1, 1, tzinfo=TZ_SHANGHAI)
 
@@ -45,3 +51,11 @@ def month_query(query: EventQuery, months_ago: int = 0) -> EventQuery:
     if months_ago == 0:
         end = now_shanghai()
     return replace(query, start=start, end=end)
+
+
+def previous_month_to_date_query(query: EventQuery) -> EventQuery:
+    now = now_shanghai()
+    current_start, _ = calendar_month_bounds(now, 0)
+    previous_start, previous_end = calendar_month_bounds(now, 1)
+    previous_same_time = previous_start + (now - current_start)
+    return replace(query, start=previous_start, end=min(previous_same_time, previous_end))

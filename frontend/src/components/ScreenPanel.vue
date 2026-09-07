@@ -9,6 +9,9 @@ defineProps<{
     <header class="head">
       <span class="mark" />
       <h3>{{ title }}</h3>
+      <div class="action">
+        <slot name="action" />
+      </div>
     </header>
     <div class="body">
       <slot />
@@ -71,6 +74,10 @@ h3 {
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.08em;
+}
+
+.action {
+  margin-left: auto;
 }
 
 .body {
