@@ -3,7 +3,7 @@
 py-opengauss PG-API 连接管理。
 """
 import logging
-from urllib.parse import quote, urlencode
+from urllib.parse import quote
 
 import py_opengauss
 from flask import current_app, g
@@ -22,8 +22,10 @@ def _build_connection_url() -> str:
     port = int(current_app.config["GAUSS_PORT"])
     database = quote(str(current_app.config["GAUSS_DATABASE"]), safe="")
     sslmode = str(current_app.config.get("GAUSS_SSLMODE", "disable"))
-    query = urlencode({"[sslmode]": sslmode})
-    return f"opengauss://{user}:{password}@{host}:{port}/{database}?{query}"
+    return (
+        f"opengauss://{user}:{password}@{host}:{port}/{database}"
+        f"?[sslmode]={quote(sslmode, safe='')}"
+    )
 
 
 def get_connection():

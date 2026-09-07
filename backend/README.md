@@ -57,7 +57,7 @@ gaussdb:
 ```
 
 对应连接形式为
-`py_opengauss.open("opengauss://root:<URL 编码密码>@127.0.0.1:5432/postgres?%5Bsslmode%5D=disable")`。
+`py_opengauss.open("opengauss://root:<URL 编码密码>@127.0.0.1:5432/postgres?[sslmode]=disable")`。
 用户名和密码由应用自动做 URL 编码；密码仍从 `GAUSS_PASSWORD` 读取和解码，
 不要将明文密码写入 YAML。
 
