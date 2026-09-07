@@ -33,7 +33,20 @@ export FLASK_ENV=local   # 或 prod
 python wsgi.py
 ```
 
-GaussDB / OpenGauss 使用 PostgreSQL 协议，驱动为 `psycopg2`。
+后端使用 `gaussdb-python`（导入名为 `gaussdb`）连接 GaussDB，避免普通
+`psycopg2` 与 GaussDB SHA256/SM3 SASL 认证不兼容。
+
+`gaussdb` 运行时还需要与目标数据库版本匹配的 GaussDB 官方客户端
+`libpq` 动态库：
+
+- Windows：将包含 `libpq.dll` 及其依赖 DLL 的官方客户端目录加入 `PATH`
+- Linux：将官方客户端 `lib` 目录加入 `LD_LIBRARY_PATH`
+
+安装后先执行以下命令确认驱动和动态库均可加载：
+
+```bash
+python -c "import gaussdb; print(gaussdb.__version__)"
+```
 
 ## 接口
 

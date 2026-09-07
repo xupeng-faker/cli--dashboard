@@ -8,6 +8,7 @@ from urllib.parse import quote_plus
 
 from flask import current_app
 from sqlalchemy import create_engine, text
+from sqlalchemy.dialects import registry
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import QueuePool
@@ -18,6 +19,12 @@ __all__ = ["init_sqlalchemy_engine", "get_session", "close_engine", "get_engine"
 
 _engine = None
 _session_factory = None
+
+registry.register(
+    "gaussdb.gaussdb",
+    "app.db.gaussdb_dialect",
+    "GaussDBDialect",
+)
 
 
 def init_sqlalchemy_engine(app) -> None:
@@ -66,7 +73,7 @@ def _build_gauss_url(host: str, port: int, user: str, password: str, database: s
     encoded_user = quote_plus(user)
     encoded_password = quote_plus(password)
     return (
-        f"postgresql+psycopg2://{encoded_user}:{encoded_password}@{host}:{port}/{database}"
+        f"gaussdb+gaussdb://{encoded_user}:{encoded_password}@{host}:{port}/{database}"
         f"?sslmode={sslmode}"
     )
 
