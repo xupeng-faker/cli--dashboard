@@ -1,6 +1,6 @@
 <script setup lang="ts">
 defineProps<{
-  items: { title: string; meta: string; value: string }[]
+  items: { title: string; meta?: string; value: string }[]
 }>()
 </script>
 
@@ -10,7 +10,7 @@ defineProps<{
       <span class="idx">{{ String(index + 1).padStart(2, '0') }}</span>
       <div class="copy">
         <div class="title">{{ item.title }}</div>
-        <div class="meta">{{ item.meta }}</div>
+        <div class="meta" v-if="item.meta">{{ item.meta }}</div>
       </div>
       <span class="value">{{ item.value }}</span>
     </li>

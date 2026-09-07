@@ -84,8 +84,9 @@ const platform_option = computed(() =>
 
 const command_option = computed(() =>
   hbar_option(
-    (overview.value?.top_commands || []).slice(0, 8).map((item) => item.command_name + ' / ' + item.domain),
+    (overview.value?.top_commands || []).slice(0, 8).map((item) => item.command),
     (overview.value?.top_commands || []).slice(0, 8).map((item) => item.total_calls),
+    280,
   ),
 )
 
@@ -109,7 +110,6 @@ const duration_option = computed(() =>
 const user_items = computed(() =>
   (users.value?.users || []).slice(0, 8).map((item) => ({
     title: `${item.user_cn_name}  ${item.user_id}`,
-    meta: item.org_dept_name4 || '',
     value: format_number(item.total_calls),
   })),
 )

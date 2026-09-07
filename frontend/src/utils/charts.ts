@@ -53,11 +53,11 @@ export function bar_option(labels: string[], values: number[], axis_name: string
   }
 }
 
-export function hbar_option(labels: string[], values: number[]): EChartsOption {
+export function hbar_option(labels: string[], values: number[], label_width = 118): EChartsOption {
   return {
     color: PALETTE,
     tooltip: { ...tooltip, trigger: 'axis', axisPointer: { type: 'shadow' } },
-    grid: { left: 128, right: 36, top: 8, bottom: 8 },
+    grid: { left: label_width + 12, right: 36, top: 8, bottom: 8 },
     xAxis: {
       type: 'value',
       axisLabel: { color: MUTED },
@@ -67,7 +67,7 @@ export function hbar_option(labels: string[], values: number[]): EChartsOption {
       type: 'category',
       data: labels,
       inverse: true,
-      axisLabel: { color: '#b7d4e6', fontSize: 11, width: 118, overflow: 'truncate' },
+      axisLabel: { color: '#b7d4e6', fontSize: 11, width: label_width, overflow: 'truncate' },
       axisLine: { show: false },
       axisTick: { show: false },
     },
