@@ -133,8 +133,9 @@ h1 {
   font-size: 12px;
 }
 
-.presets button:disabled {
-  cursor: wait;
-  opacity: 0.55;
+.presets button.active {
+  color: #061018;
+  background: var(--accent);
+  border-color: var(--accent);
 }
 </style>
