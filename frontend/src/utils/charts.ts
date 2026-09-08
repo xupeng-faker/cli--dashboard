@@ -119,50 +119,56 @@ export function pie_option(items: { name: string; value: number }[]): EChartsOpt
   }
 }
 
+function value_axis(name: string, show_split: boolean) {
+  return {
+    type: 'value' as const,
+    min: 0,
+    name,
+    nameTextStyle: { color: MUTED },
+    axisLabel: { color: MUTED },
+    axisLine: { show: true, lineStyle: { color: LINE } },
+    splitLine: show_split ? { lineStyle: { color: LINE, type: 'dashed' as const } } : { show: false },
+  }
+}
+
 export function line_option(
   labels: string[],
   series: { name: string; data: number[]; yAxisIndex?: number }[],
   y_names: [string, string?],
 ): EChartsOption {
   const dual = Boolean(y_names[1])
+  const from_origin = labels.length > 0
+  const axis_labels = from_origin ? ['', ...labels] : labels
+  const axis_series = from_origin ? series.map((item) => ({ ...item, data: [0, ...item.data] })) : series
   return {
     color: PALETTE,
-    tooltip,
+    tooltip: {
+      ...tooltip,
+      formatter(params: unknown) {
+        const items = Array.isArray(params) ? params : [params]
+        const first = items[0] as { axisValue?: string; marker?: string; seriesName?: string; value?: number } | undefined
+        if (!first || first.axisValue === '') {
+          return ''
+        }
+        const lines = items.map((item) => {
+          const point = item as { marker?: string; seriesName?: string; value?: number }
+          return `${point.marker || ''}${point.seriesName}  ${point.value ?? '-'}`
+        })
+        return `${first.axisValue}<br/>${lines.join('<br/>')}`
+      },
+    },
     legend: { top: 0, textStyle: { color: MUTED }, icon: 'circle', itemWidth: 8 },
     grid: { left: 48, right: dual ? 48 : 16, top: 36, bottom: 28 },
     xAxis: {
       type: 'category',
-      data: labels,
+      data: axis_labels,
       boundaryGap: false,
       axisLabel: { color: MUTED, fontSize: 11 },
-      axisLine: { lineStyle: { color: LINE } },
+      axisLine: { onZero: true, lineStyle: { color: LINE } },
       axisTick: { show: false },
     },
-    yAxis: dual
-      ? [
-          {
-            type: 'value',
-            name: y_names[0],
-            nameTextStyle: { color: MUTED },
-            axisLabel: { color: MUTED },
-            splitLine: { lineStyle: { color: LINE, type: 'dashed' } },
-          },
-          {
-            type: 'value',
-            name: y_names[1],
-            nameTextStyle: { color: MUTED },
-            axisLabel: { color: MUTED },
-            splitLine: { show: false },
-          },
-        ]
-      : {
-          type: 'value',
-          name: y_names[0],
-          nameTextStyle: { color: MUTED },
-          axisLabel: { color: MUTED },
-          splitLine: { lineStyle: { color: LINE, type: 'dashed' } },
-        },
-    series: series.map((item, index) => ({
+    yAxis: dual ? [value_axis(y_names[0], true), value_axis(y_names[1] || '', false)] : value_axis(y_names[0], true),
+    series: axis_series.map((item, index) => ({
       type: 'line',
       name: item.name,
       data: item.data,

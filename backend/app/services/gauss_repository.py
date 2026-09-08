@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from app.db.opengauss_connection import get_connection
 from app.services.query import EventQuery
-from app.services.stats import iter_buckets
+from app.services.stats import drop_leading_empty_buckets, iter_buckets
 from app.utils.errors import DatabaseError
 from app.utils.timeutil import to_iso
 
@@ -167,7 +167,7 @@ class GaussRepository:
         }
 
     def earliest_time(self, query: EventQuery) -> Optional[datetime]:
-        where, params = _where(query, ignore_time=True)
+        where, params = _where(query)
         row = self._one(f"SELECT MIN(event_time) AS earliest FROM {_TABLE} WHERE {where}", params)
         return _value(row, "earliest", 0)
 
@@ -191,6 +191,23 @@ class GaussRepository:
         row = self._one(sql, [query.start, query.end, *dimension_params])
         return int(_num(_value(row, "new_users", 0)))
 
+    def _new_users_by_bucket(self, query: EventQuery) -> Dict[Any, int]:
+        where, where_params = _where(query, parameter_offset=1)
+        sql = f"""
+            SELECT date_trunc($1::text, first_seen) AS bucket, COUNT(*) AS new_users
+            FROM (
+                SELECT user_id, MIN(event_time) AS first_seen
+                FROM {_TABLE}
+                WHERE {where}
+                GROUP BY user_id
+            ) first_seen_users
+            GROUP BY bucket
+        """
+        fetched: Dict[Any, int] = {}
+        for row in self._rows(sql, [query.granularity, *where_params]):
+            fetched[_value(row, "bucket")] = int(_num(_value(row, "new_users", 1)))
+        return fetched
+
     def trend(self, query: EventQuery) -> List[Dict[str, Any]]:
         where, where_params = _where(query, parameter_offset=1)
         sql = f"""
@@ -204,7 +221,10 @@ class GaussRepository:
             _value(row, "bucket"): self._row_metrics(row)
             for row in self._rows(sql, [query.granularity, *where_params])
         }
+        new_users = self._new_users_by_bucket(query) if query.cumulative else {}
         rows = []
+        cum_calls = 0
+        cum_users = 0
         for start in iter_buckets(query.start, query.end, query.granularity):
             metrics = fetched.get(start) or fetched.get(start.replace(tzinfo=None))
             metrics = metrics or {
@@ -216,17 +236,26 @@ class GaussRepository:
                 "avg_duration_ms": 0,
                 "avg_api_duration_ms": 0,
             }
+            if query.cumulative:
+                extra_users = new_users.get(start) or new_users.get(start.replace(tzinfo=None)) or 0
+                cum_calls += metrics["total_calls"]
+                cum_users += extra_users
+                calls = cum_calls
+                users = cum_users
+            else:
+                calls = metrics["total_calls"]
+                users = metrics["unique_users"]
             rows.append(
                 {
                     "bucket": start.isoformat(),
-                    "calls": metrics["total_calls"],
-                    "users": metrics["unique_users"],
+                    "calls": calls,
+                    "users": users,
                     "success_rate": metrics["success_rate"],
                     "avg_duration_ms": metrics["avg_duration_ms"],
                     "avg_api_duration_ms": metrics["avg_api_duration_ms"],
                 }
             )
-        return rows
+        return drop_leading_empty_buckets(rows)
 
     def distribution(self, query: EventQuery, key: str, limit: int = 20) -> List[Dict[str, Any]]:
         column = _DIM_COLUMNS[key]

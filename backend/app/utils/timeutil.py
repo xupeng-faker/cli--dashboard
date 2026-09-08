@@ -8,8 +8,11 @@ from zoneinfo import ZoneInfo
 
 TZ_SHANGHAI = ZoneInfo("Asia/Shanghai")
 
+DATA_START = datetime(2026, 8, 1, tzinfo=TZ_SHANGHAI)
+
 __all__ = [
     "TZ_SHANGHAI",
+    "DATA_START",
     "now_shanghai",
     "as_aware",
     "to_iso",
@@ -17,6 +20,8 @@ __all__ = [
     "start_of_month",
     "add_months",
     "calendar_month_bounds",
+    "clamp_to_data_start",
+    "default_range",
 ]
 
 
@@ -61,7 +66,12 @@ def pick_granularity(start: datetime, end: datetime) -> str:
     return "month"
 
 
+def clamp_to_data_start(value: datetime) -> datetime:
+    local = as_aware(value).astimezone(TZ_SHANGHAI)
+    if local < DATA_START:
+        return DATA_START
+    return local
+
+
 def default_range() -> tuple[datetime, datetime]:
-    end = now_shanghai()
-    start = datetime(2020, 1, 1, tzinfo=TZ_SHANGHAI)
-    return start, end
+    return DATA_START, now_shanghai()

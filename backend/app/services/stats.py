@@ -118,26 +118,52 @@ def iter_buckets(start: datetime, end: datetime, granularity: str) -> List[datet
     return buckets
 
 
+def drop_leading_empty_buckets(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    for index, row in enumerate(rows):
+        if row.get("calls"):
+            return rows[index:]
+    return []
+
+
 def compute_trend(events: Sequence[Dict[str, Any]], query: EventQuery) -> List[Dict[str, Any]]:
     granularity = query.granularity
     grouped: Dict[datetime, List[Dict[str, Any]]] = defaultdict(list)
     for event in events:
         grouped[_bucket_start(event["event_time"], granularity)].append(event)
     rows = []
+    seen_users = set()
+    cum_calls = 0
+    cum_success = 0
     for bucket in iter_buckets(query.start, query.end, granularity):
         bucket_events = grouped.get(bucket, [])
         metrics = compute_metrics(bucket_events)
-        rows.append(
-            {
-                "bucket": bucket.isoformat(),
-                "calls": metrics["total_calls"],
-                "users": metrics["unique_users"],
-                "success_rate": metrics["success_rate"],
-                "avg_duration_ms": metrics["avg_duration_ms"],
-                "avg_api_duration_ms": metrics["avg_api_duration_ms"],
-            }
-        )
-    return rows
+        if query.cumulative:
+            cum_calls += metrics["total_calls"]
+            cum_success += metrics["success_count"]
+            for event in bucket_events:
+                seen_users.add(event["user_id"])
+            rows.append(
+                {
+                    "bucket": bucket.isoformat(),
+                    "calls": cum_calls,
+                    "users": len(seen_users),
+                    "success_rate": (cum_success / cum_calls * 100) if cum_calls else 0,
+                    "avg_duration_ms": metrics["avg_duration_ms"],
+                    "avg_api_duration_ms": metrics["avg_api_duration_ms"],
+                }
+            )
+        else:
+            rows.append(
+                {
+                    "bucket": bucket.isoformat(),
+                    "calls": metrics["total_calls"],
+                    "users": metrics["unique_users"],
+                    "success_rate": metrics["success_rate"],
+                    "avg_duration_ms": metrics["avg_duration_ms"],
+                    "avg_api_duration_ms": metrics["avg_api_duration_ms"],
+                }
+            )
+    return drop_leading_empty_buckets(rows)
 
 
 def count_by(events: Sequence[Dict[str, Any]], key: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:

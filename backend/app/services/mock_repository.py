@@ -20,7 +20,7 @@ class MockRepository:
         return stats.filter_events(get_mock_events(), query, ignore_dimension=ignore_dimension)
 
     def earliest_time(self, query: EventQuery) -> Optional[datetime]:
-        rows = stats.filter_events(get_mock_events(), query, ignore_time=True)
+        rows = self._rows(query)
         if not rows:
             return None
         return min(item["event_time"] for item in rows)

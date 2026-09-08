@@ -10,7 +10,7 @@ from flask import current_app
 from app.services.gauss_repository import GaussRepository
 from app.services.mock_repository import MockRepository
 from app.services.query import EventQuery, lifetime_query, month_query, previous_month_to_date_query
-from app.utils.timeutil import as_aware, to_iso
+from app.utils.timeutil import as_aware, clamp_to_data_start, to_iso
 
 __all__ = [
     "get_repository",
@@ -67,22 +67,31 @@ def _range_meta(query: EventQuery) -> Dict[str, Any]:
         "start": to_iso(query.start),
         "end": to_iso(query.end),
         "granularity": query.granularity,
+        "cumulative": query.cumulative,
     }
 
 
-def _effective_query(repo, query: EventQuery) -> EventQuery:
-    earliest = repo.earliest_time(query)
-    if earliest is None:
-        return query
-    earliest = as_aware(earliest)
-    if query.start < earliest:
-        return replace(query, start=earliest)
+def _clamped_query(query: EventQuery) -> EventQuery:
+    start = clamp_to_data_start(query.start)
+    if start != query.start:
+        return replace(query, start=start)
     return query
+
+
+def _first_data_query(repo, query: EventQuery) -> EventQuery:
+    window = _clamped_query(query)
+    earliest = repo.earliest_time(window)
+    if earliest is None:
+        return window
+    earliest = as_aware(earliest)
+    if window.start < earliest:
+        return replace(window, start=earliest)
+    return window
 
 
 def get_overview(query: EventQuery) -> Dict[str, Any]:
     repo = get_repository()
-    chart_query = _effective_query(repo, query)
+    chart_query = _first_data_query(repo, query)
     lifetime_range = lifetime_query(query)
     this_month_range = month_query(query, 0)
     lifetime = repo.metrics(lifetime_range)
@@ -126,26 +135,28 @@ def get_overview(query: EventQuery) -> Dict[str, Any]:
 
 def get_commands(query: EventQuery) -> Dict[str, Any]:
     repo = get_repository()
+    chart_query = _first_data_query(repo, query)
     return {
         "data_source": repo.source,
-        "range": _range_meta(query),
-        "commands": repo.commands(query, limit=40),
-        "cli_versions": repo.distribution(query, "cli_version"),
-        "output_formats": repo.distribution(query, "output_format"),
-        "input_sources": repo.distribution(query, "input_source"),
-        "domains": repo.distribution(query, "domain"),
+        "range": _range_meta(chart_query),
+        "commands": repo.commands(chart_query, limit=40),
+        "cli_versions": repo.distribution(chart_query, "cli_version"),
+        "output_formats": repo.distribution(chart_query, "output_format"),
+        "input_sources": repo.distribution(chart_query, "input_source"),
+        "domains": repo.distribution(chart_query, "domain"),
     }
 
 
 def get_users(query: EventQuery) -> Dict[str, Any]:
     repo = get_repository()
+    chart_query = _first_data_query(repo, query)
     return {
         "data_source": repo.source,
-        "range": _range_meta(query),
-        "users": repo.users(query, limit=40),
-        "departments": repo.departments(query),
-        "environments": repo.distribution(query, "environment"),
-        "trend": repo.trend(query),
+        "range": _range_meta(chart_query),
+        "users": repo.users(chart_query, limit=40),
+        "departments": repo.departments(chart_query),
+        "environments": repo.distribution(chart_query, "environment"),
+        "trend": repo.trend(chart_query),
     }
 
 
@@ -173,14 +184,15 @@ def get_departments(
 
 def get_quality(query: EventQuery) -> Dict[str, Any]:
     repo = get_repository()
+    chart_query = _first_data_query(repo, query)
     return {
         "data_source": repo.source,
-        "range": _range_meta(query),
-        "metrics": repo.metrics(query),
-        "trend": repo.trend(query),
-        "error_categories": repo.error_categories(query),
-        "error_codes": repo.error_codes(query),
-        "duration_histogram": repo.duration_histogram(query),
+        "range": _range_meta(chart_query),
+        "metrics": repo.metrics(chart_query),
+        "trend": repo.trend(chart_query),
+        "error_categories": repo.error_categories(chart_query),
+        "error_codes": repo.error_codes(chart_query),
+        "duration_histogram": repo.duration_histogram(chart_query),
     }
 
 

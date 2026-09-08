@@ -7,7 +7,7 @@ from typing import Optional, Tuple
 
 from app.services.query import EventQuery
 from app.utils.errors import ValidationError
-from app.utils.timeutil import TZ_SHANGHAI, default_range, now_shanghai
+from app.utils.timeutil import TZ_SHANGHAI, clamp_to_data_start, default_range, now_shanghai
 
 __all__ = ["parse_int", "parse_limit_offset", "parse_event_query"]
 
@@ -45,9 +45,32 @@ def _parse_datetime(value: Optional[str], field_name: str) -> Optional[datetime]
     return parsed.astimezone(TZ_SHANGHAI)
 
 
+_ALLOWED_GRANULARITY = {"hour", "day", "week", "month"}
+
+
+def _parse_granularity(value: Optional[str]) -> Optional[str]:
+    if value is None or value == "":
+        return None
+    text = str(value).strip().lower()
+    if text not in _ALLOWED_GRANULARITY:
+        raise ValidationError("Invalid parameter", payload={"field": "granularity"})
+    return text
+
+
+def _parse_bool(value: Optional[str], field_name: str) -> bool:
+    if value is None or value == "":
+        return False
+    text = str(value).strip().lower()
+    if text in ("1", "true", "yes", "on"):
+        return True
+    if text in ("0", "false", "no", "off"):
+        return False
+    raise ValidationError("Invalid parameter", payload={"field": field_name})
+
+
 def parse_event_query(args) -> EventQuery:
     default_start, default_end = default_range()
-    start = _parse_datetime(args.get("start"), "start") or default_start
+    start = clamp_to_data_start(_parse_datetime(args.get("start"), "start") or default_start)
     end = _parse_datetime(args.get("end"), "end") or default_end
     if end <= start:
         raise ValidationError("Invalid time range", payload={"field": "end"})
@@ -79,4 +102,6 @@ def parse_event_query(args) -> EventQuery:
         user_id=_opt("user_id", 64),
         keyword=_opt("keyword", 128),
         input_source=_opt("input_source", 32),
+        granularity_override=_parse_granularity(args.get("granularity")),
+        cumulative=_parse_bool(args.get("cumulative"), "cumulative"),
     )

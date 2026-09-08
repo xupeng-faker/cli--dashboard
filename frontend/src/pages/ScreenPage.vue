@@ -26,11 +26,20 @@ const department_level = ref<4 | 5 | 6>(4)
 const selected_dept4 = ref<string | null>(null)
 const selected_dept5 = ref<string | null>(null)
 const department_rows = ref<NamedMetric[]>([])
+const loading = ref(true)
+let load_seq = 0
+
+function has_department_name(name: unknown): name is string {
+  return typeof name === 'string' && name.trim() !== '' && name.trim() !== '未填写部门'
+}
 
 async function load() {
+  const seq = ++load_seq
+  loading.value = true
   const query = filters.query
   try {
     const [ov, q, u] = await Promise.all([get_overview(query), get_quality(query), get_users(query)])
+    if (seq !== load_seq) return
     overview.value = ov
     quality.value = q
     users.value = u
@@ -41,13 +50,26 @@ async function load() {
     filters.options.data_source = ov.data_source
   } catch {
     return
+  } finally {
+    if (seq === load_seq) loading.value = false
   }
 }
 
 watch(() => filters.query_key, load, { immediate: true })
 
 const kpis = computed(() => overview.value?.kpis)
-const user_series_name = computed(() => (overview.value?.range.granularity === 'month' ? '月活用户' : '活跃用户'))
+const trend_cumulative = computed(() => Boolean(overview.value?.range.cumulative))
+const user_series_name = computed(() => {
+  if (trend_cumulative.value) return '累计用户'
+  return overview.value?.range.granularity === 'month' ? '月活用户' : '活跃用户'
+})
+const call_series_name = computed(() => (trend_cumulative.value ? '累计调用' : '调用量'))
+const trend_title = computed(() => {
+  if (trend_cumulative.value) {
+    return overview.value?.range.granularity === 'month' ? '按月累增' : '按日累增'
+  }
+  return `调用量与${user_series_name.value}`
+})
 const department_title = computed(() => {
   if (department_level.value === 4) return '部门调用分布（点击下钻）'
   if (department_level.value === 5) return `${selected_dept4.value} · 5级部门`
@@ -56,14 +78,16 @@ const department_title = computed(() => {
 
 const trend_option = computed(() => {
   const rows = overview.value?.trend || []
+  const start = rows.findIndex((item) => item.calls > 0)
+  const visible = start < 0 ? rows : rows.slice(start)
   const granularity = overview.value?.range.granularity || 'month'
   return line_option(
-    rows.map((item) => format_bucket(item.bucket, granularity)),
+    visible.map((item) => format_bucket(item.bucket, granularity)),
     [
-      { name: '调用量', data: rows.map((item) => item.calls) },
-      { name: user_series_name.value, data: rows.map((item) => item.users), yAxisIndex: 1 },
+      { name: call_series_name.value, data: visible.map((item) => item.calls) },
+      { name: user_series_name.value, data: visible.map((item) => item.users), yAxisIndex: 1 },
     ],
-    ['调用量', user_series_name.value],
+    [call_series_name.value, user_series_name.value],
   )
 })
 
@@ -78,10 +102,12 @@ const result_option = computed(() =>
 
 const department_option = computed(() =>
   pie_option(
-    department_rows.value.map((item) => ({
-      name: item.name,
-      value: item.total_calls,
-    })),
+    department_rows.value
+      .filter((item) => has_department_name(item.name))
+      .map((item) => ({
+        name: item.name,
+        value: item.total_calls,
+      })),
   ),
 )
 
@@ -99,7 +125,7 @@ async function show_department_level(level: 5 | 6, dept4: string, dept5?: string
 
 function drill_department(params: { name?: string }) {
   const name = params.name
-  if (!name || name === '未填写部门') return
+  if (!has_department_name(name)) return
   if (department_level.value === 4) {
     void show_department_level(5, name)
   } else if (department_level.value === 5 && selected_dept4.value) {
@@ -119,10 +145,10 @@ function back_department() {
 }
 
 const platform_option = computed(() =>
-  bar_option(
+  hbar_option(
     (overview.value?.platform_dist || []).map((item) => item.name),
     (overview.value?.platform_dist || []).map((item) => item.total_calls),
-    '调用量',
+    78,
   ),
 )
 
@@ -162,20 +188,25 @@ const user_items = computed(() =>
 <template>
   <ScreenLayout>
     <ScreenHeader />
-    <div class="kpis" v-if="kpis">
-      <KpiMetric label="累计调用" :display="format_number(kpis.total_calls.value)" :kpi="kpis.total_calls" />
-      <KpiMetric label="累计用户" :display="format_number(kpis.total_users.value)" :kpi="kpis.total_users" />
-      <KpiMetric label="月活用户" :display="format_number(kpis.mau.value)" :kpi="kpis.mau" />
-      <KpiMetric label="本月新增用户" :display="format_number(kpis.new_users.value)" :kpi="kpis.new_users" />
-      <KpiMetric label="本月调用" :display="format_number(kpis.month_calls.value)" :kpi="kpis.month_calls" />
-      <KpiMetric
-        label="本月人均调用"
-        :display="format_number(kpis.avg_calls_per_user.value)"
-        :kpi="kpis.avg_calls_per_user"
-      />
-    </div>
+    <div class="body">
+      <div v-if="loading" class="loading-mask">
+        <div class="spinner" />
+        <span>数据加载中</span>
+      </div>
+      <div class="kpis" v-if="kpis">
+        <KpiMetric label="累计调用" :display="format_number(kpis.total_calls.value)" :kpi="kpis.total_calls" />
+        <KpiMetric label="累计用户" :display="format_number(kpis.total_users.value)" :kpi="kpis.total_users" />
+        <KpiMetric label="月活用户" :display="format_number(kpis.mau.value)" :kpi="kpis.mau" />
+        <KpiMetric label="本月新增用户" :display="format_number(kpis.new_users.value)" :kpi="kpis.new_users" />
+        <KpiMetric label="本月调用" :display="format_number(kpis.month_calls.value)" :kpi="kpis.month_calls" />
+        <KpiMetric
+          label="本月人均调用"
+          :display="format_number(kpis.avg_calls_per_user.value)"
+          :kpi="kpis.avg_calls_per_user"
+        />
+      </div>
 
-    <div class="grid">
+      <div class="grid">
       <div class="col">
         <ScreenPanel title="执行结果">
           <ChartBox :option="result_option" />
@@ -189,7 +220,7 @@ const user_items = computed(() =>
       </div>
 
       <div class="col center">
-        <ScreenPanel :title="`调用量与${user_series_name}`">
+        <ScreenPanel :title="trend_title">
           <ChartBox :option="trend_option" />
         </ScreenPanel>
         <ScreenPanel title="热门指令">
@@ -214,10 +245,49 @@ const user_items = computed(() =>
         </ScreenPanel>
       </div>
     </div>
+    </div>
   </ScreenLayout>
 </template>
 
 <style scoped>
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.loading-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(3, 10, 20, 0.72);
+  color: var(--accent);
+  font-size: 13px;
+  letter-spacing: 0.22em;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid rgba(62, 198, 255, 0.18);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .kpis {
   display: grid;
   grid-template-columns: repeat(6, 1fr);

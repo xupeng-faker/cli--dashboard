@@ -6,7 +6,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Optional
 
-from app.utils.timeutil import TZ_SHANGHAI, calendar_month_bounds, now_shanghai, pick_granularity
+from app.utils.timeutil import DATA_START, calendar_month_bounds, now_shanghai, pick_granularity
 
 __all__ = [
     "EventQuery",
@@ -16,7 +16,7 @@ __all__ = [
     "previous_month_to_date_query",
 ]
 
-LIFETIME_START = datetime(2000, 1, 1, tzinfo=TZ_SHANGHAI)
+LIFETIME_START = DATA_START
 
 
 @dataclass
@@ -31,9 +31,13 @@ class EventQuery:
     user_id: Optional[str] = None
     keyword: Optional[str] = None
     input_source: Optional[str] = None
+    granularity_override: Optional[str] = None
+    cumulative: bool = False
 
     @property
     def granularity(self) -> str:
+        if self.granularity_override in ("hour", "day", "week", "month"):
+            return self.granularity_override
         return pick_granularity(self.start, self.end)
 
 

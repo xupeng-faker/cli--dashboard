@@ -5,6 +5,8 @@ import { get_filter_options } from '@/api/dashboard'
 
 export type RangePreset = 'month' | '3m' | '12m' | 'all'
 
+const DATA_START = new Date('2026-08-01T00:00:00+08:00')
+
 function start_of_month(date = new Date()): Date {
   const start = new Date(date)
   start.setDate(1)
@@ -23,12 +25,22 @@ function format_date(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
+function clamp_start(start: Date): Date {
+  return start < DATA_START ? new Date(DATA_START) : start
+}
+
+function trend_mode(preset: RangePreset): Pick<DashboardQuery, 'granularity' | 'cumulative'> {
+  if (preset === '12m') return { granularity: 'month', cumulative: true }
+  if (preset === 'all') return { granularity: 'day', cumulative: true }
+  return {}
+}
+
 function range_of(preset: RangePreset): [Date, Date] {
   const end = new Date()
-  if (preset === 'month') return [start_of_month(end), end]
-  if (preset === '3m') return [add_months(end, -3), end]
-  if (preset === '12m') return [add_months(end, -12), end]
-  return [new Date(2020, 0, 1), end]
+  if (preset === 'month') return [clamp_start(start_of_month(end)), end]
+  if (preset === '3m') return [clamp_start(add_months(end, -3)), end]
+  if (preset === '12m') return [clamp_start(add_months(end, -12)), end]
+  return [new Date(DATA_START), end]
 }
 
 export const useFilterStore = defineStore('filters', () => {
@@ -48,6 +60,7 @@ export const useFilterStore = defineStore('filters', () => {
   const query = computed<DashboardQuery>(() => ({
     start: date_range.value[0].toISOString(),
     end: date_range.value[1].toISOString(),
+    ...trend_mode(preset.value),
   }))
 
   const query_key = computed(() => JSON.stringify(query.value))

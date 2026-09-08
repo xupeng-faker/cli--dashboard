@@ -10,6 +10,7 @@ export interface TimeRangeMeta {
   start: string
   end: string
   granularity: 'hour' | 'day' | 'week' | 'month'
+  cumulative?: boolean
 }
 
 export interface MetricRow {
@@ -163,6 +164,8 @@ export interface FilterOptions {
 export interface DashboardQuery {
   start: string
   end: string
+  granularity?: 'hour' | 'day' | 'week' | 'month'
+  cumulative?: boolean
   domain?: string
   platform?: string
   environment?: string
