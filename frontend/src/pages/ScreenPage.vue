@@ -29,8 +29,12 @@ const department_rows = ref<NamedMetric[]>([])
 const loading = ref(true)
 let load_seq = 0
 
-function has_department_name(name: unknown): name is string {
-  return typeof name === 'string' && name.trim() !== '' && name.trim() !== '未填写部门'
+function has_display_name(name: unknown): name is string {
+  if (typeof name !== 'string') return false
+  const text = name.trim()
+  if (!text) return false
+  const normalized = text.toLowerCase()
+  return normalized !== 'unknown' && text !== '未知' && text !== '未填写部门'
 }
 
 async function load() {
@@ -103,7 +107,7 @@ const result_option = computed(() =>
 const department_option = computed(() =>
   pie_option(
     department_rows.value
-      .filter((item) => has_department_name(item.name))
+      .filter((item) => has_display_name(item.name))
       .map((item) => ({
         name: item.name,
         value: item.total_calls,
@@ -125,7 +129,7 @@ async function show_department_level(level: 5 | 6, dept4: string, dept5?: string
 
 function drill_department(params: { name?: string }) {
   const name = params.name
-  if (!has_department_name(name)) return
+  if (!has_display_name(name)) return
   if (department_level.value === 4) {
     void show_department_level(5, name)
   } else if (department_level.value === 5 && selected_dept4.value) {
@@ -144,10 +148,14 @@ function back_department() {
   department_rows.value = overview.value?.dept4_dist || []
 }
 
+const platform_rows = computed(() =>
+  (overview.value?.platform_dist || []).filter((item) => has_display_name(item.name)),
+)
+
 const platform_option = computed(() =>
   hbar_option(
-    (overview.value?.platform_dist || []).map((item) => item.name),
-    (overview.value?.platform_dist || []).map((item) => item.total_calls),
+    platform_rows.value.map((item) => item.name),
+    platform_rows.value.map((item) => item.total_calls),
     78,
   ),
 )
@@ -169,10 +177,14 @@ const error_option = computed(() =>
   ),
 )
 
+const domain_rows = computed(() =>
+  (overview.value?.domain_dist || []).filter((item) => has_display_name(item.name)),
+)
+
 const domain_option = computed(() =>
   bar_option(
-    (overview.value?.domain_dist || []).map((item) => item.name),
-    (overview.value?.domain_dist || []).map((item) => item.total_calls),
+    domain_rows.value.map((item) => item.name),
+    domain_rows.value.map((item) => item.total_calls),
     '调用量',
   ),
 )
