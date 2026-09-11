@@ -47,10 +47,14 @@ def _kpi(
     previous_value = _round(previous or 0)
     change = None
     if hint is None:
-        if previous:
-            change = round((float(current or 0) - float(previous)) / float(previous) * 100, 1)
+        previous_number = float(previous or 0)
+        current_number = float(current or 0)
+        if previous_number:
+            change = round((current_number - previous_number) / previous_number * 100, 1)
+        elif current_number:
+            hint = "上期无数据"
         else:
-            change = 100.0 if current else 0.0
+            change = 0.0
     payload = {
         "value": current_value,
         "prev": previous_value,
