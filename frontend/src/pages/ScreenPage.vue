@@ -6,12 +6,11 @@ import RankList from '@/components/RankList.vue'
 import ScreenHeader from '@/components/ScreenHeader.vue'
 import ScreenPanel from '@/components/ScreenPanel.vue'
 import ScreenLayout from '@/layouts/ScreenLayout.vue'
-import { get_departments, get_overview, get_quality, get_users } from '@/api/dashboard'
+import { get_departments, get_overview, get_users } from '@/api/dashboard'
 import { useFilterStore } from '@/stores/filters'
-import type { NamedMetric, OverviewPayload, QualityPayload, UsersPayload } from '@/types/dashboard'
+import type { NamedMetric, OverviewPayload, UsersPayload } from '@/types/dashboard'
 import { bar_option, hbar_option, line_option, pie_option } from '@/utils/charts'
 import {
-  ERROR_CATEGORY_LABELS,
   RESULT_LABELS,
   format_bucket,
   format_number,
@@ -20,7 +19,6 @@ import {
 
 const filters = useFilterStore()
 const overview = ref<OverviewPayload | null>(null)
-const quality = ref<QualityPayload | null>(null)
 const users = ref<UsersPayload | null>(null)
 const department_level = ref<4 | 5 | 6>(4)
 const selected_dept4 = ref<string | null>(null)
@@ -42,10 +40,9 @@ async function load() {
   loading.value = true
   const query = filters.query
   try {
-    const [ov, q, u] = await Promise.all([get_overview(query), get_quality(query), get_users(query)])
+    const [ov, u] = await Promise.all([get_overview(query), get_users(query)])
     if (seq !== load_seq) return
     overview.value = ov
-    quality.value = q
     users.value = u
     department_level.value = 4
     selected_dept4.value = null
@@ -168,12 +165,15 @@ const command_option = computed(() =>
   ),
 )
 
-const error_option = computed(() =>
-  pie_option(
-    (quality.value?.error_categories || []).map((item) => ({
-      name: label_of(ERROR_CATEGORY_LABELS, item.name),
-      value: item.total_calls,
-    })),
+const version_rows = computed(() =>
+  (overview.value?.cli_version_dist || []).filter((item) => has_display_name(item.name)),
+)
+
+const version_option = computed(() =>
+  hbar_option(
+    version_rows.value.map((item) => item.name),
+    version_rows.value.map((item) => item.total_calls),
+    72,
   ),
 )
 
@@ -223,8 +223,8 @@ const user_items = computed(() =>
         <ScreenPanel title="执行结果">
           <ChartBox :option="result_option" />
         </ScreenPanel>
-        <ScreenPanel title="错误分类">
-          <ChartBox :option="error_option" />
+        <ScreenPanel title="领域调用分布">
+          <ChartBox :option="domain_option" />
         </ScreenPanel>
         <ScreenPanel title="平台调用量">
           <ChartBox :option="platform_option" />
@@ -241,8 +241,8 @@ const user_items = computed(() =>
       </div>
 
       <div class="col">
-        <ScreenPanel title="领域调用分布">
-          <ChartBox :option="domain_option" />
+        <ScreenPanel title="CLI 版本调用分布">
+          <ChartBox :option="version_option" />
         </ScreenPanel>
         <ScreenPanel :title="department_title">
           <template #action>

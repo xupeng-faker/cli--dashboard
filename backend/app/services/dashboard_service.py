@@ -132,6 +132,7 @@ def get_overview(query: EventQuery) -> Dict[str, Any]:
         "domain_dist": repo.distribution(chart_query, "domain"),
         "platform_dist": repo.distribution(chart_query, "platform"),
         "input_source_dist": repo.distribution(chart_query, "input_source"),
+        "cli_version_dist": repo.distribution(chart_query, "cli_version"),
         "dept4_dist": repo.departments(chart_query, field="org_dept_name4"),
         "top_commands": repo.commands(chart_query, limit=10),
     }

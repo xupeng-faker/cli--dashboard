@@ -68,6 +68,7 @@ export interface OverviewPayload {
   domain_dist: NamedMetric[]
   platform_dist: NamedMetric[]
   input_source_dist: NamedMetric[]
+  cli_version_dist: NamedMetric[]
   dept4_dist: NamedMetric[]
   top_commands: CommandRow[]
 }
